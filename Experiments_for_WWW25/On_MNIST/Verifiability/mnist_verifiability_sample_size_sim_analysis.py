@@ -29,7 +29,7 @@ marker_s = 3
 markevery=1
 #plt.figure(figsize=(8, 5.3))
 #plt.plot(x, unl_fr, color='blue', marker='^', label='Retrain',linewidth=l_w, markersize=m_s)
-plt.plot(x, unl_cap, linestyle='-', color='#797BB7', marker='o', fillstyle='full', markevery=markevery,label='CAP', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+plt.plot(x, unl_cap, linestyle='-', color='#797BB7', marker='o', fillstyle='full', markevery=markevery, label='EUV', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 
 # plt.plot(x, unl_muv, linestyle='--', color='#9BC985',  marker='s', fillstyle='full', markevery=markevery, label='TaPD',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)

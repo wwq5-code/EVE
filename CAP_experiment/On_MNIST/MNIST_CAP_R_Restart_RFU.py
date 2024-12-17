@@ -421,6 +421,8 @@ def prepare_unl(erasing_dataset, dataloader_remaining_after_aux, model, loss_fn,
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
             optimizer.step()
             acc_back = (logits_y_e.argmax(dim=1) == y_e).float().mean().item()
+            acc_r = eva_vib(model, dataloader_target_only, args, name='on target data', epoch=999)
+            backdoor_acc_list.append(acc_r)
             metrics = {
                 'acc_back': acc_back,
                 'loss1': loss.item(),
@@ -451,6 +453,7 @@ def prepare_unl(erasing_dataset, dataloader_remaining_after_aux, model, loss_fn,
             backdoor_acc = eva_vib(model, erasing_dataset, args, name='on erased data', epoch=999)
             if backdoor_acc < 0.15:
                 break
+    print("backdoor_acc_list", backdoor_acc_list)
     return model
 
 def prepare_update_direction(unlearned_vib, model):
@@ -505,7 +508,7 @@ def construct_input(dataset, dataloader_target_only_label_modified, target_vib, 
         x2 = x
         for idx in range(x2.size(0)):
             if y_rate[idx] == 0:
-                x2[idx] = x2[idx] / 4 + target_x
+                x2[idx] =  target_x #x2[idx] / 20 +
 
         x2 = x2 + random_patch
         x2 = x2.clamp(0, 1)
@@ -785,19 +788,19 @@ args.dataset = 'MNIST'
 args.add_noise = False
 args.beta = 0.0001
 args.mse_rate = 0.1
-args.lr = 0.0001
+args.lr = 0.0005
 args.unlearn_learning_rate = 0.1
 args.ep_distance = 20
 args.dimZ = 128  # 40 # 2
 args.batch_size = 16
-args.erased_local_r = 0.01
-args.construct_size = 0.01
-args.auxiliary_size = 0.01
+args.erased_local_r = 0.02
+args.construct_size = 0.02
+# args.auxiliary_size = 0.01
 args.train_type = "MULTI"
 args.kld_to_org = 1
 args.unlearn_bce = 0.3
 args.self_sharing_rate = 0.8
-args.laplace_scale = 0.8
+args.laplace_scale = 1
 args.laplace_epsilon = 10
 args.num_epochs_recon = 50
 
@@ -911,16 +914,24 @@ add_backdoor = 1  # =1 add backdoor , !=1 not add
 mode = "Mark Erasing Data"
 # feature_extra = SimpleCNN().cuda()
 
+# target_set
 erasing_with_tri, erasing_with_tri_tar = add_trigger_new(add_backdoor, dataset2, erasing_size, mode)
 # samples with backdoor trigger, not in the remainig dataset.
 dataloader_erasing_with_tri = DataLoader(erasing_with_tri, batch_size=args.batch_size, shuffle=True)
 dataloader_erasing_with_tri_tar = DataLoader(erasing_with_tri_tar, batch_size=args.batch_size, shuffle=True)
 
-combined_dataset = ConcatDataset([dataset1, erasing_with_tri, dataset2, dataset3]) # with original dataset2, to show the noise extent.
+
+
+target_with_tri, target_with_tri_tar = add_trigger_new(add_backdoor, target_set, erasing_size, mode)
+
+dataloader_target_with_tri = DataLoader(target_with_tri, batch_size=args.batch_size, shuffle=True)
+dataloader_target_with_tri_tar = DataLoader(target_with_tri_tar, batch_size=args.batch_size, shuffle=True)
+
+combined_dataset = ConcatDataset([dataset1, dataset2, dataset3]) # with original dataset2, to show the noise extent.
 dataloader_remaining_and_erasing = DataLoader(combined_dataset, batch_size=args.batch_size, shuffle=True)
 
 sim_list = []
-for step, (x, y) in enumerate(dataloader_erasing_with_tri):
+for step, (x, y) in enumerate(dataloader_remaining_and_erasing):
     x, y = x.to(args.device), y.to(args.device)  # (B, C, H, W), (B, 10)
     x_after_ldp = add_laplace_noise(x, epsilon=args.laplace_epsilon,sensitivity=1,args=args)
     x1_norm = F.normalize(x.view(-1), p=2, dim=0)
@@ -936,20 +947,6 @@ print("DP sim", sum(sim_list)/len(sim_list))
 
 # poison_samples = int(full_size) * args.erased_local_r
 
-x, y = erasing_with_tri[0]
-
-# print(x)
-x = x.cpu().data
-x = x.clamp(0, 1)
-if args.dataset == "MNIST":
-    x = x.view(x.size(0), 1, 28, 28)
-elif args.dataset == "CIFAR10":
-    x = x.view(1, 3, 32, 32)
-print(x)
-grid = torchvision.utils.make_grid(x, nrow=1)
-# grid = torchvision.utils.make_grid(x, nrow=1, cmap="gray")
-# plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
-# plt.show()if name == 'encoder.linear_head.bias':
 
 
 vib, lr = init_vib(args)
@@ -993,7 +990,7 @@ print(f'VIB Training took {running_time} seconds')
 # dataloader_target_with_trigger = DataLoader(target_with_tri, batch_size=args.batch_size, shuffle=True)
 vib.eval()
 acc_r = eva_vib(vib, dataloader_erasing, args, name='on clean remaining dataset', epoch=999)
-backdoor_acc = eva_vib(vib, dataloader_erasing_with_tri, args, name='on backdoored erasing dataset', epoch=999)
+backdoor_acc = eva_vib(vib, dataloader_target_with_tri, args, name='on backdoored erasing dataset', epoch=999)
 acc = eva_vib(vib, test_loader, args, name='on test dataset', epoch=999)
 
 
@@ -1005,7 +1002,7 @@ vib_adv_target = copy.deepcopy(vib)
 start_time = time.time()
 for epoch in range(20):
     vib_adv_target.train()
-    vib_adv_target = vib_train(dataloader_target_only_label_modified, vib_adv_target, loss_fn, reconstruction_function, args, epoch,
+    vib_adv_target = vib_train(dataloader_target_with_tri, vib_adv_target, loss_fn, reconstruction_function, args, epoch,
                     train_type)  # dataloader_total, dataloader_w_o_twin
 
 end_time = time.time()
@@ -1013,8 +1010,8 @@ running_time = end_time - start_time
 print(f'VIB Training took {running_time} seconds')
 vib_adv_target.eval()
 acc_r = eva_vib(vib_adv_target, dataloader_target, args, name='on target data', epoch=999)
-acc_r = eva_vib(vib_adv_target, dataloader_target_only, args, name='on target only data', epoch=999)
-acc_r = eva_vib(vib_adv_target, dataloader_target_only_label_modified, args, name='on modified target only data', epoch=999)
+acc_r = eva_vib(vib_adv_target, dataloader_target_with_tri_tar, args, name='on dataloader_target_with_tri_tar', epoch=999)
+acc_r = eva_vib(vib_adv_target, dataloader_target_with_tri, args, name='on dataloader_target_with_tri', epoch=999)
 
 
 
@@ -1027,7 +1024,7 @@ start_time = time.time()
 fixed_vib = copy.deepcopy(vib)
 fixed_vib_2 = copy.deepcopy(vib) ## this is kept for OUL reconstruction
 for epoch in range(args.num_epochs):
-    dataloader_constructing1, fixed_vib = construct_input(dataloader_constructing1, dataloader_target_only, vib_adv_target,
+    dataloader_constructing1, fixed_vib = construct_input(dataloader_constructing1, dataloader_target_with_tri_tar, vib_adv_target,
                                                             fixed_vib,
                                                             loss_fn, args,
                                                             epoch)
@@ -1052,14 +1049,88 @@ print(f'unlearning {running_time} seconds')
 unlearned_vib.eval()
 acc_r = eva_vib(unlearned_vib, dataloader_target, args, name='on target data', epoch=999)
 acc_r = eva_vib(unlearned_vib, dataloader_target_only, args, name='on target only data', epoch=999)
-acc_r = eva_vib(unlearned_vib, dataloader_target_only_label_modified, args, name='on modified target only data', epoch=999)
+acc_r = eva_vib(unlearned_vib, dataloader_target_with_tri_tar, args, name='on dataloader_target_with_tri_tar', epoch=999)
 
 
 con_acc = eva_vib(unlearned_vib, dataloader_constructing1, args, name='unlearned model on constructing data', epoch=999)
-#backdoor_acc = eva_vib(unlearned_vib, dataloader_erasing_with_tri, args, name='unlearned model on erased data', epoch=999) ## erased samples_with_trigger should be included
+backdoor_acc = eva_vib(unlearned_vib, dataloader_erasing_with_tri, args, name='unlearned model on erased data', epoch=999) ## erased samples_with_trigger should be included
 acc = eva_vib(unlearned_vib, test_loader, args, name='unlearned model on test dataset', epoch=999)
 
 
+
+# Custom Dataset wrapper to move data to CUDA and handle non-tensor labels
+class CudaDataset(Dataset):
+    def __init__(self, dataset, device, sample_ratio=1.0):
+        """
+        A custom dataset wrapper to move data to CUDA and optionally sample a fraction of the dataset.
+
+        Args:
+            dataset (Dataset): The original dataset.
+            device (torch.device): The device to which data should be moved (e.g., CUDA).
+            sample_ratio (float): Fraction of the dataset to sample (default: 1.0, entire dataset).
+        """
+        self.dataset = dataset
+        self.device = device
+        self.sample_ratio = sample_ratio
+
+        # Determine the indices to include based on the sample ratio
+        self.indices = random.sample(range(len(self.dataset)), int(len(self.dataset) * self.sample_ratio))
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        # Map the idx to the original dataset index
+        original_idx = self.indices[idx]
+
+        # Fetch data and label from the original dataset
+        data, label = self.dataset[original_idx]
+
+        # Convert data and label to tensors if they aren’t already
+        if not isinstance(data, torch.Tensor):
+            data = torch.tensor(data)
+        if not isinstance(label, torch.Tensor):
+            label = torch.tensor(label)
+
+        # Move them to the specified device (e.g., CUDA)
+        data = data.to(self.device)
+        label = label.to(self.device)
+
+        return data, label
+
+
+# Set device to CUDA if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Wrap the datasets to move their data to CUDA
+cuda_constructing_dataset = CudaDataset(dataloader_constructing1.dataset, device, sample_ratio=1)
+cuda_erasing_dataset = CudaDataset(dataloader_erasing.dataset, device, sample_ratio=0.02)
+
+# Assuming dataloader_constructing1 and dataloader_erasing have datasets you can access
+dataset_combined = ConcatDataset([cuda_constructing_dataset, cuda_erasing_dataset])
+
+# Now, create a single dataloader for the combined dataset
+combined_dataloader = DataLoader(dataset_combined, batch_size=args.batch_size, shuffle=True)
+
+print("prepare unlearning update gradient2")
+unlearned_vib2 = copy.deepcopy(vib)
+start_time = time.time()
+unlearned_vib2 = prepare_unl(combined_dataloader, dataloader_remaining_w_o_cons, unlearned_vib2, loss_fn, args,
+                             "no noise")
+# unlearned_vib = prepare_unl(dataloader_constructing1, unlearned_vib, loss_fn, args, "no noise")
+end_time = time.time()
+running_time = end_time - start_time
+print(f'unlearning {running_time} seconds')
+
+unlearned_vib2.eval()
+acc_r = eva_vib(unlearned_vib2, dataloader_target, args, name='on target data', epoch=999)
+acc_r = eva_vib(unlearned_vib2, dataloader_target_only, args, name='on target only data', epoch=999)
+acc_r = eva_vib(unlearned_vib2, dataloader_target_with_tri_tar, args, name='on dataloader_target_with_tri_tar', epoch=999)
+
+
+con_acc = eva_vib(unlearned_vib2, dataloader_constructing1, args, name='unlearned model on constructing data', epoch=999)
+backdoor_acc = eva_vib(unlearned_vib2, dataloader_erasing_with_tri, args, name='unlearned model on erased data', epoch=999) ## erased samples_with_trigger should be included
+acc = eva_vib(unlearned_vib2, test_loader, args, name='unlearned model on test dataset', epoch=999)
 
 
 

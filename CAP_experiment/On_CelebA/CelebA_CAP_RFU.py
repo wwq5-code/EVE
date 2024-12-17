@@ -459,6 +459,8 @@ def prepare_unl(erasing_dataset, dataloader_remaining_after_aux, model, loss_fn,
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
             optimizer.step()
             acc_back = (logits_y_e.argmax(dim=1) == y_e).float().mean().item()
+            acc_r = eva_vib(model, dataloader_target_only, args, name='on target data', epoch=999)
+            backdoor_acc_list.append(acc_r)
             metrics = {
                 'acc_back': acc_back,
                 'loss1': loss.item(),
@@ -489,6 +491,7 @@ def prepare_unl(erasing_dataset, dataloader_remaining_after_aux, model, loss_fn,
         # backdoor_acc = eva_vib(model, erasing_dataset, args, name='on erased data', epoch=999)
         # if backdoor_acc < 0.1:
         #     break
+    print("backdoor_acc_list", backdoor_acc_list)
     return model
 
 def prepare_update_direction(unlearned_vib, model):
@@ -1092,26 +1095,63 @@ acc = eva_vib(unlearned_vib, test_loader, args, name='unlearned model on test da
 
 
 
+# Custom Dataset wrapper to move data to CUDA and handle non-tensor labels
+class CudaDataset(Dataset):
+    def __init__(self, dataset, device):
+        self.dataset = dataset
+        self.device = device
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        # Fetch data and label from the original dataset
+        data, label = self.dataset[idx]
+
+        # Convert data and label to tensors if they aren’t already
+        if not isinstance(data, torch.Tensor):
+            data = torch.tensor(data)
+        if not isinstance(label, torch.Tensor):
+            label = torch.tensor(label)
+
+        # Move them to the specified device (e.g., CUDA)
+        data = data.to(self.device)
+        label = label.to(self.device)
+
+        return data, label
+
+
+# Set device to CUDA if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Wrap the datasets to move their data to CUDA
+cuda_constructing_dataset = CudaDataset(dataloader_constructing1.dataset, device)
+cuda_erasing_dataset = CudaDataset(dataloader_erasing.dataset, device)
+
+# Assuming dataloader_constructing1 and dataloader_erasing have datasets you can access
+dataset_combined = ConcatDataset([cuda_constructing_dataset, cuda_erasing_dataset])
+
+# Now, create a single dataloader for the combined dataset
+combined_dataloader = DataLoader(dataset_combined, batch_size=args.batch_size, shuffle=True)
 
 print("prepare unlearning update gradient")
 unlearned_vib2 = copy.deepcopy(vib)
 start_time = time.time()
-unlearned_vib2 = prepare_unl(dataloader_erasing, dataloader_remaining_w_o_cons, unlearned_vib2, loss_fn, args, "no noise")
-#unlearned_vib = prepare_unl(dataloader_constructing1, unlearned_vib, loss_fn, args, "no noise")
+unlearned_vib2 = prepare_unl(combined_dataloader, dataloader_remaining_w_o_cons, unlearned_vib2, loss_fn, args,
+                             "no noise")
+# unlearned_vib = prepare_unl(dataloader_constructing1, unlearned_vib, loss_fn, args, "no noise")
 end_time = time.time()
 running_time = end_time - start_time
 print(f'unlearning {running_time} seconds')
 
 unlearned_vib.eval()
-# acc_r = eva_vib(unlearned_vib2, dataloader_target, args, name='on target data', epoch=999)
+#acc_r = eva_vib(unlearned_vib2, dataloader_target, args, name='on target data', epoch=999)
 acc_r = eva_vib(unlearned_vib2, dataloader_target_only, args, name='on target only data', epoch=999)
 acc_r = eva_vib(unlearned_vib2, dataloader_target_with_tri_tar, args, name='on dataloader_target_with_tri_tar', epoch=999)
 
-
 con_acc = eva_vib(unlearned_vib2, dataloader_constructing1, args, name='unlearned model on constructing data', epoch=999)
-backdoor_acc = eva_vib(unlearned_vib2, dataloader_erasing_with_tri, args, name='unlearned model on erased data', epoch=999) ## erased samples_with_trigger should be included
+backdoor_acc = eva_vib(unlearned_vib2, dataloader_erasing_with_tri, args, name='unlearned model on erased data', epoch=999)  ## erased samples_with_trigger should be included
 acc = eva_vib(unlearned_vib2, test_loader, args, name='unlearned model on test dataset', epoch=999)
-
 
 
 

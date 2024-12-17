@@ -317,7 +317,7 @@ def num_params(model):
 
 def vib_train(dataset, model, loss_fn, reconstruction_function, args, epoch, train_type):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-
+    acc_list = []
     for step, (x, y) in enumerate(dataset):
         x, y = x.to(args.device), y.to(args.device)  # (B, C, H, W), (B, 10)
         # x = x.view(x.size(0), -1)
@@ -345,7 +345,8 @@ def vib_train(dataset, model, loss_fn, reconstruction_function, args, epoch, tra
         # Check if gradients exist for x
         # input_gradient = x.grad.detach()
         optimizer.step()
-
+        # acc_r = eva_vib(model, dataloader_target_only, args, name='on target data', epoch=999)
+        # acc_list.append(acc_r)
         # acc = (logits_y.argmax(dim=1) == y).float().mean().item()
         sigma = torch.sqrt_(torch.exp(logvar)).mean().item()
         # JS_p_q = 1 - js_div(logits_y.softmax(dim=1), y.softmax(dim=1)).mean().item()
@@ -381,7 +382,7 @@ def vib_train(dataset, model, loss_fn, reconstruction_function, args, epoch, tra
             # plt.show()
             # print("print x grad")
             # print(input_gradient)
-
+    # print("acc_list", acc_list)
     return model
 
 # here we prepare the unlearned model, and we can calculate the model difference
@@ -422,6 +423,20 @@ def prepare_unl(erasing_dataset, dataloader_remaining_after_aux, model, loss_fn,
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
             optimizer.step()
             acc_back = (logits_y_e.argmax(dim=1) == y_e).float().mean().item()
+            # Assuming logits_y_e are the model's predictions (logits) and y_e are the true labels
+
+            # calculate for the target label
+            # Create a mask for samples where y_e == 2
+            mask = (y_e == 2)
+            # Get the predicted classes
+            predictions = logits_y_e.argmax(dim=1)
+            # Apply the mask to both predictions and true labels
+            masked_predictions = predictions[mask]
+            masked_true_labels = y_e[mask]
+            # Calculate accuracy only for label=2
+            acc_label2 = (masked_predictions == masked_true_labels).float().mean().item()
+            acc_r = eva_vib(model, dataloader_target_only, args, name='on target data', epoch=999)
+            acc = (logits_y_r.argmax(dim=1) == y_r).float().mean().item()
             metrics = {
                 'acc_back': acc_back,
                 'loss1': loss.item(),
@@ -447,11 +462,15 @@ def prepare_unl(erasing_dataset, dataloader_remaining_after_aux, model, loss_fn,
                 print(acc_back)
                 print("print x grad")
                 # print(updated_x)
+            backdoor_acc_list.append(acc_r)
+            acc_test.append(acc)
             if acc_back<0.1:
                 break
             # backdoor_acc = eva_vib(model, erasing_dataset, args, name='on erased data', epoch=999)
             # if backdoor_acc < 0.1:
             #     break
+    print("backdoor_acc_list", backdoor_acc_list)
+    print("acc_test", acc_test)
     return model
 
 def prepare_update_direction(unlearned_vib, model):
@@ -801,7 +820,6 @@ full_size = len(train_set)
 
 
 target_size = 1
-
 full_size_w_o_target = full_size - target_size
 full_w_o_target_set, target_set = torch.utils.data.random_split(train_set,
                                                            [full_size_w_o_target, target_size])
@@ -883,10 +901,12 @@ add_backdoor = 1  # =1 add backdoor , !=1 not add
 mode = "Mark Erasing Data"
 # feature_extra = SimpleCNN().cuda()
 
+
 erasing_with_tri, erasing_with_tri_tar = add_trigger_new(add_backdoor, dataset2, erasing_size, mode)
 # samples with backdoor trigger, not in the remainig dataset.
 dataloader_erasing_with_tri = DataLoader(erasing_with_tri, batch_size=args.batch_size, shuffle=True)
 dataloader_erasing_with_tri_tar = DataLoader(erasing_with_tri_tar, batch_size=args.batch_size, shuffle=True)
+
 
 # target_set
 target_with_tri, target_with_tri_tar = add_trigger_new(add_backdoor, target_set, erasing_size, mode)
@@ -1048,20 +1068,86 @@ backdoor_acc = eva_vib(unlearned_vib, dataloader_erasing_with_tri, args, name='u
 acc = eva_vib(unlearned_vib, test_loader, args, name='unlearned model on test dataset', epoch=999)
 
 
+# continual_learning_vib = copy.deepcopy(vib)
+# start_time = time.time()
+# for epoch in range(args.num_epochs):
+#     continual_learning_vib.train()
+#     continual_learning_vib = vib_train(dataloader_constructing1, continual_learning_vib, loss_fn, reconstruction_function, args, epoch,
+#                     train_type)  # dataloader_total, dataloader_w_o_twin
+#
+# print('acc list', clean_acc_list)
+# print('mse list', mse_list)
+# end_time = time.time()
+# running_time = end_time - start_time
+# print(f'VIB Training took {running_time} seconds')
 
 
 
+# Custom Dataset wrapper to move data to CUDA and handle non-tensor labels
+class CudaDataset(Dataset):
+    def __init__(self, dataset, device, sample_ratio=1.0):
+        """
+        A custom dataset wrapper to move data to CUDA and optionally sample a fraction of the dataset.
 
-print("prepare unlearning update gradient")
+        Args:
+            dataset (Dataset): The original dataset.
+            device (torch.device): The device to which data should be moved (e.g., CUDA).
+            sample_ratio (float): Fraction of the dataset to sample (default: 1.0, entire dataset).
+        """
+        self.dataset = dataset
+        self.device = device
+        self.sample_ratio = sample_ratio
+
+        # Determine the indices to include based on the sample ratio
+        self.indices = random.sample(range(len(self.dataset)), int(len(self.dataset) * self.sample_ratio))
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        # Map the idx to the original dataset index
+        original_idx = self.indices[idx]
+
+        # Fetch data and label from the original dataset
+        data, label = self.dataset[original_idx]
+
+        # Convert data and label to tensors if they aren’t already
+        if not isinstance(data, torch.Tensor):
+            data = torch.tensor(data)
+        if not isinstance(label, torch.Tensor):
+            label = torch.tensor(label)
+
+        # Move them to the specified device (e.g., CUDA)
+        data = data.to(self.device)
+        label = label.to(self.device)
+
+        return data, label
+
+
+# Set device to CUDA if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Wrap the datasets to move their data to CUDA
+cuda_constructing_dataset = CudaDataset(dataloader_constructing1.dataset, device, sample_ratio=1)
+cuda_erasing_dataset = CudaDataset(dataloader_erasing.dataset, device, sample_ratio=0.2)
+
+# Assuming dataloader_constructing1 and dataloader_erasing have datasets you can access
+dataset_combined = ConcatDataset([cuda_constructing_dataset, cuda_erasing_dataset])
+
+# Now, create a single dataloader for the combined dataset
+combined_dataloader = DataLoader(dataset_combined, batch_size=args.batch_size, shuffle=True)
+
+print("prepare unlearning update gradient2")
 unlearned_vib2 = copy.deepcopy(vib)
 start_time = time.time()
-unlearned_vib2 = prepare_unl(dataloader_erasing, dataloader_remaining_w_o_cons, unlearned_vib2, loss_fn, args, "no noise")
-#unlearned_vib = prepare_unl(dataloader_constructing1, unlearned_vib, loss_fn, args, "no noise")
+unlearned_vib2 = prepare_unl(combined_dataloader, dataloader_remaining_w_o_cons, unlearned_vib2, loss_fn, args,
+                             "no noise")
+# unlearned_vib = prepare_unl(dataloader_constructing1, unlearned_vib, loss_fn, args, "no noise")
 end_time = time.time()
 running_time = end_time - start_time
 print(f'unlearning {running_time} seconds')
 
-unlearned_vib.eval()
+unlearned_vib2.eval()
 acc_r = eva_vib(unlearned_vib2, dataloader_target, args, name='on target data', epoch=999)
 acc_r = eva_vib(unlearned_vib2, dataloader_target_only, args, name='on target only data', epoch=999)
 acc_r = eva_vib(unlearned_vib2, dataloader_target_with_tri_tar, args, name='on dataloader_target_with_tri_tar', epoch=999)
@@ -1070,7 +1156,5 @@ acc_r = eva_vib(unlearned_vib2, dataloader_target_with_tri_tar, args, name='on d
 con_acc = eva_vib(unlearned_vib2, dataloader_constructing1, args, name='unlearned model on constructing data', epoch=999)
 backdoor_acc = eva_vib(unlearned_vib2, dataloader_erasing_with_tri, args, name='unlearned model on erased data', epoch=999) ## erased samples_with_trigger should be included
 acc = eva_vib(unlearned_vib2, test_loader, args, name='unlearned model on test dataset', epoch=999)
-
-
 
 

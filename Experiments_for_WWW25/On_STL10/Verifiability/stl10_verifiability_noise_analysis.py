@@ -30,7 +30,7 @@ marker_s = 3
 markevery=1
 #plt.figure(figsize=(8, 5.3))
 #plt.plot(x, unl_fr, color='blue', marker='^', label='Retrain',linewidth=l_w, markersize=m_s)
-plt.plot(x, unl_cap, linestyle='-', color='#797BB7', marker='o', fillstyle='full', markevery=markevery, label='CAP', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+plt.plot(x, unl_cap, linestyle='-', color='#797BB7', marker='o', fillstyle='full', markevery=markevery, label='EUV', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 plt.plot(x, unl_mib, linestyle='-.', color='#2A5522',  marker='D', fillstyle='full', markevery=markevery,
          label='MIB',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
@@ -53,7 +53,7 @@ plt.ylabel('Verifiability' ,fontsize=28)
 my_y_ticks = np.arange(0.9, 1.01, 0.02)
 plt.yticks(my_y_ticks,fontsize=28)
 plt.ylim(0.9, 1.01)
-plt.xlabel('Perturbation Limit' ,fontsize=28)
+plt.xlabel('Perturbation Distance' ,fontsize=28)
 
 plt.xticks(x, labels, fontsize=28)
 # plt.title('CIFAR10 IID')

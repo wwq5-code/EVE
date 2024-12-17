@@ -545,7 +545,7 @@ width = 0.7  # the width of the bars
 
 
 # Plot the bars
-ax[2,2].bar(x - width / 5, cap_ms_not_in, width=width/2.5, label='CAP', color='#F7D58B', edgecolor='black', hatch='*')
+ax[2,2].bar(x - width / 5, cap_ms_not_in, width=width/2.5, label='EUV', color='#F7D58B', edgecolor='black', hatch='*')
 #ax[2,2].bar(x + width / 5, mib_ms_not_in, width=width/2.5, label='MS In', color='#E58579', edgecolor='black', hatch='/')
 
 ax[2,2].bar(x + width / 5, mib_ms_not_in, width=width/2.5, label='MIB', color='#B595BF', edgecolor='black', hatch='\\')

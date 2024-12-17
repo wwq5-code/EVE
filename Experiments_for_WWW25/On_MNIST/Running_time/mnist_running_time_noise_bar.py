@@ -38,7 +38,7 @@ markevery=1
 #
 # plt.bar(x + width / 5, mib_ms_not_in, width=width/2.5, label='MIB', color='#B595BF', edgecolor='black', hatch='\\')
 
-plt.plot(x, cap_ms_not_in, linestyle='-', color='#797BB7', marker='o', fillstyle='full', markevery=markevery, label='CAP', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+plt.plot(x, cap_ms_not_in, linestyle='-', color='#797BB7', marker='o', fillstyle='full', markevery=markevery, label='EUV', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 plt.plot(x, mib_ms_not_in, linestyle='-.', color='#2A5522',  marker='D', fillstyle='full', markevery=markevery,
          label='MIB',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
@@ -59,7 +59,7 @@ my_y_ticks = np.arange(0, 200.1, 40)
 plt.yticks(my_y_ticks, fontsize=28)
 # ax.set_yticklabels(my_y_ticks,fontsize=15)
 plt.legend(loc='best', fontsize=28)
-plt.xlabel('Perturbation Limit' ,fontsize=28)
+plt.xlabel('Perturbation Distance' ,fontsize=28)
 # ax.bar_label(rects1, padding=1)
 # ax.bar_label(rects2, padding=3)
 # ax.bar_label(rects3, padding=3)

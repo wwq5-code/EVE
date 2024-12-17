@@ -26,21 +26,23 @@ m_s=15
 marker_s = 3
 markevery=1
 
-ax1.plot(x, cap_ms_not_in, linestyle='-', color='#797BB7', marker='o', fillstyle='full', markevery=markevery, label='CAP', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+ax1.plot(x, cap_ms_not_in, linestyle='-', color='#797BB7', marker='o', fillstyle='full', markevery=markevery, label='EUV', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 ax1.plot(x, mib_ms_not_in, linestyle='-.', color='#2A5522',  marker='D', fillstyle='full', markevery=markevery, label='MIB',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 ax1.set_ylim(500, 600)
+ax1.tick_params(axis='y', labelsize=18)
 ax1.spines['bottom'].set_visible(False)
 ax1.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
 
 
-ax2.plot(x, cap_ms_not_in, linestyle='-', color='#797BB7', marker='o', fillstyle='full', markevery=markevery, label='CAP', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+ax2.plot(x, cap_ms_not_in, linestyle='-', color='#797BB7', marker='o', fillstyle='full', markevery=markevery, label='EUV', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 ax2.plot(x, mib_ms_not_in, linestyle='-.', color='#2A5522',  marker='D', fillstyle='full', markevery=markevery, label='MIB',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 
 ax2.set_ylim(0, 10)
+ax2.tick_params(axis='y', labelsize=18)
 ax2.spines['top'].set_visible(False)
 
 # Add diagonal lines to indicate a break in the y-axis
@@ -54,7 +56,7 @@ ax2.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
 ax2.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
 
 # Labels
-ax2.set_xlabel('Perturbation Limit' ,fontsize=28)
+ax2.set_xlabel('Perturbation Distance' ,fontsize=28)
 ax2.set_ylabel('Running Time (s)', fontsize=28)
 # ax2.yaxis.set_label_position('right')
 ax2.yaxis.set_label_coords(-0.1, 0.7)
