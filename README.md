@@ -1,8 +1,8 @@
-# EUV
+# EVE
 
-# EUV: Towards Efficient Unlearning Verification via Customized Perturbation
+# EVE: Efficient Verification of Data Erasure via Customized Perturbation to Induce Unlearning
 ## Overview
-This repository is the official implementation of EUV, and the corresponding paper is under review.
+This repository is the official implementation of EVE, and the corresponding paper is under review.
 
 
 ## Prerequisites
@@ -24,7 +24,7 @@ Evaluated on NVIDIA Quadro RTX 6000 GPUs,
 
 On MNIST, ESR=2%
 
-| On MNIST             | Original    | MIB      |   EUV   | 
+| On MNIST             | Original    | MIB      |   EVE   | 
 | --------             | --------    | -------- | -------- |  
 | Running time (s)     | 142         | 146      |  12.81     |  
 | Unl. Verifiability   | -           | 100.0%   | 100.0%   |   
@@ -36,24 +36,24 @@ On MNIST, ESR=2%
 In this table, we can achieve these metric values by running corresponding python files.
 
 
-1. To run the EUV on MNIST, we can run
+1. To run the EVE on MNIST, we can run
 ```
 python /CAP_for_unl_veri/CAP_experiment/On_MNIST/MNIST_CAP_R_Restart_RFU.py
 ```
 
 
-2. To run the EUV on CIFAR10, we can run
+2. To run the EVE on CIFAR10, we can run
 ```
 python /CAP_for_unl_veri/CAP_experiment/On_CIFAR10/CIFAR10_CAP_RFU.py
 ```
 
-3. To run the EUV on STL-10, we can run
+3. To run the EVE on STL-10, we can run
 
 ```
 python /CAP_for_unl_veri/CAP_experiment/On_STL10/STL10_CAP_RFU.py
 ```
 
-4. To run the EUV on CelebA, we can run
+4. To run the EVE on CelebA, we can run
 
 ```
 python /CAP_for_unl_veri/CAP_experiment/On_CelebA/CelebA_CAP_RFU.py
